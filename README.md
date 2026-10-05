@@ -175,5 +175,5 @@ As an AI-forward engineer, AI tools (Claude, GitHub Copilot) were leveraged as i
 ## 8. Assessment Submission Details
 
 - **Candidate**: Ammar Ali (`ammar.ali.uc@gmail.com`)
-- **Live Deployment URL**: `https://ajaia-document-editor.vercel.app` *(or custom Vercel preview)*
+- **Live Deployment URL**: `https://ajaia-document-n2fi.vercel.app`
 - **Walkthrough Video**: 3-5 minute unlisted walkthrough demonstration covering User A (owner) workflow, User B (shared) workflow, User C (denied access), and `.txt` file import.
