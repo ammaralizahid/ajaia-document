@@ -1,162 +1,179 @@
 # Ajaia Document Editor
 
-A lightweight, secure shared document workspace built for the Ajaia AI-Native Full Stack Developer assessment.
+A lightweight, secure shared document workspace inspired by Google Docs, built for the Ajaia AI-Native Full Stack Developer assessment.
 
-Features rich-text editing (adapted from Leads Lord's Tiptap implementation), durable PostgreSQL JSONB persistence, optimistic concurrency control, asynchronous document sharing, plain text file import, and granular access control.
-
----
-
-## 1. Tech Stack
-
-- **Framework**: Next.js 16.3.8 (App Router, Turbopack, React 19.2.8, TypeScript)
-- **Styling**: Tailwind CSS v4 with `@tailwindcss/typography`
-- **Rich-Text Engine**: Tiptap v2 (StarterKit, Heading, Underline, Link, TextStyle, Color, Highlight, FontFamily, custom FontSize, TextAlign, Placeholder)
-- **Database**: PostgreSQL (Serverless Neon HTTP driver + local Node-Postgres fallback)
-- **ORM & Migrations**: Drizzle ORM (`drizzle-kit`) with committed SQL migrations
-- **Authentication**: Better Auth (Email/password sessions, Drizzle adapter, public signup disabled at API level)
-- **Testing**: Vitest with unit and integration test suites
+The application supports rich-text document editing, in-place document renaming, UTF-8 plain text file import, granular document sharing with seeded demo accounts, optimistic concurrency control (CAS revision tracking), owner deletion, and durable PostgreSQL persistence.
 
 ---
 
-## 2. Prerequisites
+## 1. Quickstart & Local Setup
 
+### Prerequisites
 - **Node.js**: `v20.x` or `v22.x` (tested on `v22.23.2`)
 - **npm**: `v10.x` or later
-- **PostgreSQL**: Local PostgreSQL 16/17 server or a remote [Neon](https://neon.tech) database
+- **PostgreSQL**: Local PostgreSQL 16/17 server or a cloud [Neon](https://neon.tech) database
 
----
+### Step 1: Clone & Install Dependencies
+```bash
+git clone https://github.com/ammaralizahid/ajaia-document.git
+cd ajaia-document
+npm install
+```
 
-## 3. Environment Configuration
-
-Create a `.env.local` file in the project root based on `.env.example`:
-
+### Step 2: Configure Environment Variables
+Copy the sample environment file to `.env.local`:
 ```bash
 cp .env.example .env.local
 ```
 
-### Required Variables:
-
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | PostgreSQL connection string (Neon or local) | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` or `postgresql://localhost:5432/ajaia_docs_dev` |
-| `DATABASE_MIGRATION_URL` | Optional migration connection string | Same as `DATABASE_URL` |
-| `BETTER_AUTH_SECRET` | Secret key for auth token signing (>= 32 chars) | `your-secure-random-secret-key-at-least-32-chars` |
-| `BETTER_AUTH_URL` | Base URL of the application | `http://localhost:3001` |
-| `NEXT_PUBLIC_APP_URL` | Public application URL | `http://localhost:3001` |
-| `ALLOW_SEED_SIGNUP` | Set to `"true"` ONLY when executing seed or test setups | `"true"` |
-
----
-
-## 4. Setup & Running Locally
-
-### Step 1: Install Dependencies
-```bash
-npm install --legacy-peer-deps
+Configure the following variables in `.env.local`:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/ajaia_docs_dev"
+BETTER_AUTH_SECRET="your-secure-random-secret-key-at-least-32-chars"
+BETTER_AUTH_URL="http://localhost:3001"
+NEXT_PUBLIC_APP_URL="http://localhost:3001"
 ```
 
-### Step 2: Run Database Migrations
-Applies committed SQL schema migrations from `./drizzle/migrations`:
+### Step 3: Run Database Migrations
+Applies the committed SQL migrations from `./drizzle/migrations`:
 ```bash
 npm run db:migrate
 ```
 
-### Step 3: Seed Demo Accounts
-Idempotently creates the 3 dedicated assessment demo users and a sample document:
+### Step 4: Seed Demo Accounts
+Idempotently creates the 3 dedicated demo users and a sample document:
 ```bash
 npm run seed
 ```
 
-### Step 4: Run Development Server
+### Step 5: Start the Development Server
 ```bash
 npm run dev
 ```
-The application will be accessible at [http://localhost:3001](http://localhost:3001).
-
-*(Port 3001 is used by default to prevent conflicts with occupied port 3107).*
-
-### Production Build & Run:
-```bash
-npm run build
-npm run start
-```
+Open **[http://localhost:3001](http://localhost:3001)** in your browser.  
+*(Port 3001 is configured by default to avoid port conflicts).*
 
 ---
 
-## 5. Demo Accounts
+## 2. Demo Accounts
 
-The application includes three dedicated demo users:
+The login page includes one-click quick-fill buttons for the three seeded demo accounts:
 
-| User | Email | Password | Role & Purpose |
+| Account | Email | Password | Role & Purpose |
 | :--- | :--- | :--- | :--- |
-| **User A** | `alice@ajaia.demo` | `Demo1234!` | **Document Owner**: Demonstrates creating, editing, renaming, and sharing documents |
-| **User B** | `bob@ajaia.demo` | `Demo1234!` | **Shared Collaborator**: Demonstrates receiving edit access, viewing under "Shared with me", editing content (cannot rename/share) |
-| **User C** | `carol@ajaia.demo` | `Demo1234!` | **Unauthorized User**: Demonstrates strict access control (cannot see or access A/B documents) |
+| **User A** | `alice@ajaia.demo` | `Demo1234!` | **Document Owner**: Create, edit, rename, delete, and share documents |
+| **User B** | `bob@ajaia.demo` | `Demo1234!` | **Collaborator**: Edit shared documents under "Shared with me" (cannot rename, delete, or re-share) |
+| **User C** | `carol@ajaia.demo` | `Demo1234!` | **Unauthorized User**: Demonstrates access control (cannot see or access Alice/Bob's documents) |
 
-Public signup is disabled at the API level (`databaseHooks.user.create.before`), preventing arbitrary public registrations.
+*Public registration is disabled at the API level (`databaseHooks.user.create.before`) to prevent unauthorized signups.*
 
 ---
 
-## 6. Testing
+## 3. Core Features & Capabilities
 
-### Run Unit Tests
-Exercises Tiptap JSON content validation, node/mark whitelists, title trimming, and plain text conversion:
+1. **Document Creation & Browser Editing**:
+   - Create new documents from the dashboard or import existing `.txt` files.
+   - Click-to-rename document titles in-place (owner-only, 120-character limit).
+   - Rich-text editor toolbar:
+     - Basic marks: **Bold**, *Italic*, <u>Underline</u>, ~~Strikethrough~~
+     - Headings: Paragraph, Heading 1, Heading 2, Heading 3, Heading 4
+     - Structure: Bulleted lists, numbered lists, blockquotes
+     - Styling: Text colors, highlight colors, custom font family (Inter, Roboto, Playfair Display, Merriweather, Poppins, JetBrains Mono), custom font sizes (12px to 32px), text alignment (left, center, right)
+     - Utilities: Insert/edit links, clear formatting, undo/redo stack
+2. **File Upload & Import Workflow**:
+   - "Import .txt" button on the dashboard header.
+   - Supports UTF-8 encoded plain text (`.txt`) up to 1 MiB.
+   - Converts line breaks and paragraphs into structured Tiptap JSON blocks.
+   - Rejects non-`.txt` files, oversized files, and binary files with null bytes. Literal HTML is preserved as plain text (never evaluated or injected).
+3. **Sharing Model**:
+   - Owners can grant edit access to other seeded accounts by email.
+   - Visual distinction on dashboard: "My documents" (with blue Owner badge and trash icon) vs "Shared with me" (with purple Shared badge and owner attribution).
+   - Non-owners see a purple "Shared" badge in the editor header and cannot rename, share, or delete the document.
+4. **Document Deletion**:
+   - Owners can delete documents directly from dashboard cards or from inside the editor header.
+   - Requires explicit confirmation via modal. Deleting cascades across all document shares.
+5. **Durable Persistence & Concurrency**:
+   - PostgreSQL JSONB schema storing document structure and revision counters.
+   - Serialized autosave (3s debounce) + explicit Save button (`Ctrl+S` / `Cmd+S`).
+   - Compare-and-Swap (CAS) optimistic concurrency control: returning HTTP 409 if a stale revision is submitted, preserving local unsaved drafts with clipboard copy options.
+
+---
+
+## 4. Testing & Verification
+
+### Automated Unit Tests
+19 comprehensive unit tests verifying title trimming/limits, Tiptap JSON schema structure, node/mark whitelists, URL protocol whitelists, 2 MiB payload caps, and text-to-document conversion:
 ```bash
 npm run test:unit
 ```
 
-### Run Integration Tests
-Runs the complete 20-scenario suite against the live running application and a real PostgreSQL database (exercises authentication, CRUD, renaming, CAS revision conflicts, access denial, sharing, and UTF-8 `.txt` import):
+### Integration Tests
+End-to-end API integration tests exercising authentication, document CRUD, access denial, sharing grants, CAS revision conflict detection, and file imports against a real PostgreSQL database:
 ```bash
-# Terminal 1: Start test server
-ALLOW_SEED_SIGNUP=true DATABASE_URL="postgresql://localhost:5432/ajaia_docs_test" npm run start
-
-# Terminal 2: Run test suite
-TEST_APP_URL="http://localhost:3001" TEST_DATABASE_URL="postgresql://localhost:5432/ajaia_docs_test" npm run test:integration
+TEST_DATABASE_URL="postgresql://localhost:5432/ajaia_docs_test" npm run test:integration
 ```
 
-### Run All Tests:
+### Typecheck & Linting
 ```bash
-TEST_APP_URL="http://localhost:3001" TEST_DATABASE_URL="postgresql://localhost:5432/ajaia_docs_test" npm run test:all
+npm run typecheck
+npm run lint
 ```
 
 ---
 
-## 7. Supported File Import
+## 5. Architecture Note
 
-- **Format**: Plain text files with extension `.txt`
-- **Encoding**: UTF-8 only (verified via `TextDecoder("utf-8", { fatal: true })`)
-- **Max File Size**: 1 MiB (HTTP 413 returned if exceeded)
-- **Binary Rejection**: Rejects files containing null bytes (`\0`) with HTTP 422
-- **Conversion**: Blank-line separated blocks become paragraph nodes; single line breaks become hard break nodes
-- **Security**: Text is inserted as literal text nodes. Literal HTML tags (e.g. `<script>`) remain plain text characters and are never parsed as HTML elements.
+### Technical Stack & Key Decisions
+- **Next.js 16 (App Router) & React 19**: Server components for route security; dedicated client boundary components for interactive surfaces (`DashboardClient`, `EditorClient`, `DocumentEditor`).
+- **PostgreSQL & Drizzle ORM**: Durable relational storage for users, sessions, documents, and shares. Document content is stored as native `jsonb` rather than HTML strings, preventing markup drift, sanitization overhead, and injection vulnerabilities.
+- **Tiptap v2 Rich-Text Engine**: Adapted from our internal project, Leads Lord. The editor engine was decoupled from email-specific layouts and HTML state synchronization, switching to structured JSONB with cursor and undo-stack preservation.
+- **Better Auth**: First-class session cookies and credential verification integrated with Drizzle ORM, with public signups blocked at the database hook level.
+
+### Concurrency Model & Tradeoffs
+- **Prioritized**: Asynchronous collaboration with optimistic revision tracking (`revision: integer`). Saves use atomic Compare-and-Swap (`WHERE id = ? AND revision = ?`). If a concurrent session saves first, the second session receives HTTP 409, preserving their uncommitted draft and preventing accidental data clobbering.
+- **Intentionally Deprioritized**: Full real-time co-editing (WebSockets, Yjs, CRDTs), comments, and DOCX/PDF export were intentionally deferred to deliver a robust, dependable core editing and sharing experience within the 4-6 hour assessment timebox.
 
 ---
 
-## 8. Deployment to Vercel & Neon
+## 6. AI-Native Workflow Note
 
-1. **Database (Neon Free)**:
-   - Create a free project on [Neon](https://neon.tech).
-   - Copy the connection string (`postgresql://...sslmode=require`).
-   - Run migrations against Neon:
+As an AI-forward engineer, AI tools (Claude, GitHub Copilot) were leveraged as interactive pair-programming accelerators rather than autonomous replacements:
+
+1. **Where AI Accelerated Delivery**:
+   - **Boilerplate & Extraction**: Rapidly scaffolded Drizzle schema definitions, seed scripts, and adapted the ~1,500-line rich-text editor from Leads Lord into modular Tiptap extensions.
+   - **Test Generation**: Generated exhaustive edge-case test matrices for `content-validation.ts` (oversized payloads, malicious link schemes, null-byte binary detection).
+   - **Schema & Query Typing**: Accelerated writing type-safe SQL queries with Drizzle ORM relations and cascading foreign keys.
+2. **What Was Rejected or Corrected**:
+   - **State Synchronization**: Initial AI suggestions leaned toward two-way reactive HTML string props, which cause cursor jumping and reset the undo stack. This was rejected in favor of one-time initialization with internal Tiptap state and debounced JSON emission.
+   - **Auth Adapters**: Caught and corrected a subtle PostgreSQL timestamp vs boolean mismatch in Better Auth session schema definitions during migration.
+   - **Over-Scoping**: Firmly rejected AI-suggested complexity like real-time WebSocket infrastructure and Yjs CRDTs to keep the solution rock-solid, focused, and resilient within the time limit.
+3. **Verification**:
+   - All critical paths were verified with automated unit tests (19/19 passing), clean ESLint and TypeScript compilation, and multi-user browser testing across concurrent sessions.
+
+---
+
+## 7. Deployment Instructions (Vercel + Neon)
+
+1. **Database**:
+   - Provision a PostgreSQL database on [Neon](https://neon.tech).
+   - Run migrations and seed against the Neon database:
      ```bash
-     DATABASE_URL="<neon-connection-string>" npm run db:migrate
-     ALLOW_SEED_SIGNUP=true DATABASE_URL="<neon-connection-string>" npm run seed
+     DATABASE_URL="postgresql://...sslmode=require" npm run db:migrate
+     ALLOW_SEED_SIGNUP=true DATABASE_URL="postgresql://...sslmode=require" npm run seed
      ```
-
-2. **Web Application (Vercel Hobby)**:
-   - Link repository to Vercel.
-   - Configure Environment Variables in Project Settings:
-     - `DATABASE_URL`: Neon pooled connection string
-     - `BETTER_AUTH_SECRET`: Random 32+ character string
-     - `BETTER_AUTH_URL`: `https://your-vercel-domain.vercel.app`
-     - `NEXT_PUBLIC_APP_URL`: `https://your-vercel-domain.vercel.app`
+2. **Application (Vercel)**:
+   - Import the repository on [Vercel](https://vercel.com).
+   - Set Environment Variables:
+     - `DATABASE_URL`: Neon connection string
+     - `BETTER_AUTH_SECRET`: Random 32+ character string (`openssl rand -base64 32`)
+     - `BETTER_AUTH_URL`: Your Vercel deployment URL (e.g. `https://ajaia-docs.vercel.app`)
+     - `NEXT_PUBLIC_APP_URL`: Your Vercel deployment URL
    - Deploy.
 
 ---
 
-## 9. Architectural Boundaries & Intentional Limitations
+## 8. Assessment Submission Details
 
-- **Asynchronous Collaboration Only**: Real-time collaborative editing (WebSockets, Yjs, CRDTs) is intentionally omitted in favor of optimistic concurrency control (CAS revision increments with HTTP 409 conflict detection).
-- **Sharing Model**: Owners grant edit access to seeded accounts. View-only roles, arbitrary email invitations, and public link sharing are not implemented.
-- **Import Scope**: Only UTF-8 `.txt` files are supported. DOCX, Markdown, and PDF conversions are out of scope.
-- **Authoritative Storage**: PostgreSQL JSONB is authoritative. LocalStorage is not used for document persistence.
+- **Candidate**: Ammar Ali (`ammar.ali.uc@gmail.com`)
+- **Live Deployment URL**: `https://ajaia-document-editor.vercel.app` *(or custom Vercel preview)*
+- **Walkthrough Video**: 3-5 minute unlisted walkthrough demonstration covering User A (owner) workflow, User B (shared) workflow, User C (denied access), and `.txt` file import.

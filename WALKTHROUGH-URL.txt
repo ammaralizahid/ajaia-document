@@ -1,5 +1,0 @@
-STATUS: PENDING_HUMAN_RECORDING
-
-An actual human screen recording has not yet been recorded. Per assessment instructions ("actual recorded video URL only when available; otherwise explicitly pending human recording. Do not fabricate a video link"), no placeholder or fictional video link is provided.
-
-A comprehensive, time-coded 3–5 minute walkthrough script has been prepared in `WALKTHROUGH-SCRIPT.md` to guide the live recording.
