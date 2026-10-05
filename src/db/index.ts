@@ -29,10 +29,10 @@ function isLocalhost(url: string): boolean {
 
 function getDb() {
   if (_db) return _db;
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Add it to your .env.local file (see .env.example)."
+      "DATABASE_URL (or POSTGRES_URL) is not set. Add it to your .env.local file or Vercel Environment Variables."
     );
   }
 
