@@ -13,6 +13,7 @@ type DocumentSummary = {
   ownerName: string;
   ownerEmail: string;
   relationship: "owned" | "shared";
+  role?: "owner" | "editor" | "viewer";
 };
 
 function formatDate(iso: string) {
@@ -327,10 +328,16 @@ function DocumentGrid({
                 className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                   relationship === "owned"
                     ? "bg-blue-100 text-blue-700"
+                    : doc.role === "viewer"
+                    ? "bg-amber-100 text-amber-700"
                     : "bg-purple-100 text-purple-700"
                 }`}
               >
-                {relationship === "owned" ? "Owner" : "Shared"}
+                {relationship === "owned"
+                  ? "Owner"
+                  : doc.role === "viewer"
+                  ? "Shared (Viewer)"
+                  : "Shared (Editor)"}
               </span>
               {relationship === "owned" && onDelete && (
                 <button

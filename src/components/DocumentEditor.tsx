@@ -189,6 +189,13 @@ export default function DocumentEditor({
     },
   });
 
+  // Keep tiptap editable state in sync with editable prop
+  React.useEffect(() => {
+    if (editor && editor.isEditable !== editable) {
+      editor.setEditable(editable);
+    }
+  }, [editor, editable]);
+
   // ── Toolbar handlers ────────────────────────────────────────────────────────
 
   const setHeading = (level: string) => {

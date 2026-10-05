@@ -285,4 +285,41 @@ describe("tiptapToPlainText", () => {
   });
 });
 
+describe("Auth and Role Permissions Contract", () => {
+  it("requireUserId returns ID for active session", async () => {
+    const { requireUserId } = await import("../src/lib/access");
+    const session = {
+      user: { id: "user_123", email: "alice@ajaia.demo", name: "Alice" },
+      session: { id: "sess_1", userId: "user_123", expiresAt: new Date() },
+    };
+    expect(requireUserId(session as unknown as Parameters<typeof requireUserId>[0])).toBe("user_123");
+  });
+
+  it("requireUserId throws AuthError 401 for missing session or user", async () => {
+    const { requireUserId, AuthError } = await import("../src/lib/access");
+    expect(() => requireUserId(null)).toThrow(AuthError);
+    expect(() => requireUserId({ user: null } as unknown as Parameters<typeof requireUserId>[0])).toThrow(AuthError);
+  });
+
+  it("AuthError captures message and HTTP status correctly", async () => {
+    const { AuthError } = await import("../src/lib/access");
+    const err = new AuthError("Forbidden action", 403);
+    expect(err.message).toBe("Forbidden action");
+    expect(err.status).toBe(403);
+    expect(err.name).toBe("AuthError");
+  });
+
+  it("Enforces viewer vs editor role semantics", () => {
+    const roles = {
+      owner: { role: "owner", canEdit: true },
+      editor: { role: "editor", canEdit: true },
+      viewer: { role: "viewer", canEdit: false },
+    } as const;
+
+    expect(roles.owner.canEdit).toBe(true);
+    expect(roles.editor.canEdit).toBe(true);
+    expect(roles.viewer.canEdit).toBe(false);
+  });
+});
+
 

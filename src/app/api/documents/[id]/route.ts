@@ -91,6 +91,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       const doc = await getAccessibleDocument(id, userId);
       if (!doc) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+      // Permission check: Viewers cannot save edits
+      if (!doc.canEdit) {
+        return NextResponse.json(
+          { error: "You have view-only access to this document." },
+          { status: 403 }
+        );
+      }
+
       // If also renaming, must be owner
       if (title !== undefined && doc.ownerId !== userId) {
         return NextResponse.json({ error: "Only the owner can rename" }, { status: 403 });
@@ -128,7 +136,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
               eq(documents.revision, expectedRevision),
               sql`EXISTS (
                 SELECT 1 FROM document_shares ds
-                WHERE ds.document_id = ${id} AND ds.user_id = ${userId}
+                WHERE ds.document_id = ${id} AND ds.user_id = ${userId} AND ds.role = 'editor'
               )`
             );
 

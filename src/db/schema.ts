@@ -108,6 +108,7 @@ export const documentShares = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor"), // "editor" | "viewer"
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

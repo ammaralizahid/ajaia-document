@@ -85,14 +85,23 @@ The login page includes one-click quick-fill buttons for the three seeded demo a
    - Supports UTF-8 encoded plain text (`.txt`) up to 1 MiB.
    - Converts line breaks and paragraphs into structured Tiptap JSON blocks.
    - Rejects non-`.txt` files, oversized files, and binary files with null bytes. Literal HTML is preserved as plain text (never evaluated or injected).
-3. **Sharing Model**:
-   - Owners can grant edit access to other seeded accounts by email.
-   - Visual distinction on dashboard: "My documents" (with blue Owner badge and trash icon) vs "Shared with me" (with purple Shared badge and owner attribution).
-   - Non-owners see a purple "Shared" badge in the editor header and cannot rename, share, or delete the document.
-4. **Document Deletion**:
+3. **Sharing Model & Role-Based Permissions**:
+   - Owners can grant collaborator access by email with customizable roles:
+     - **Can Edit (Editor)**: Can edit document content; cannot rename, delete, or manage shares.
+     - **Can View (Viewer)**: Read-only access (`editable={false}`). Content save operations are strictly rejected at the API and database levels with HTTP 403 Forbidden.
+   - **Access Revocation**: Owners can revoke any collaborator's access at any time directly in the Share dialog (`DELETE /api/documents/:id/shares?userId=...`).
+   - Visual distinction on dashboard: "My documents" (with blue Owner badge and delete action) vs "Shared with me" (with distinct `Shared (Editor)` or `Shared (Viewer)` pill badges and owner attribution).
+   - In editor header: non-owners see `Shared (Editor)` or `Shared (Viewer)` along with a `View only` status badge.
+4. **Export & Word Statistics**:
+   - Instant export options via the Export dropdown menu in the editor header:
+     - **Markdown (`.md`)**: Downloads clean CommonMark formatted text with proper headings, lists, blockquotes, and links.
+     - **PDF (Print Preview)**: Custom print stylesheet formatted for A4 pages, automatically hiding headers, toolbars, and shadows.
+     - **Plain Text (`.txt`)**: Downloads clean plain text stripped of markdown markup.
+   - Live word and character counter in the editor header updating on every keystroke.
+5. **Document Deletion**:
    - Owners can delete documents directly from dashboard cards or from inside the editor header.
    - Requires explicit confirmation via modal. Deleting cascades across all document shares.
-5. **Durable Persistence & Concurrency**:
+6. **Durable Persistence & Concurrency**:
    - PostgreSQL JSONB schema storing document structure and revision counters.
    - Serialized autosave (3s debounce) + explicit Save button (`Ctrl+S` / `Cmd+S`).
    - Compare-and-Swap (CAS) optimistic concurrency control: returning HTTP 409 if a stale revision is submitted, preserving local unsaved drafts with clipboard copy options.
@@ -102,7 +111,7 @@ The login page includes one-click quick-fill buttons for the three seeded demo a
 ## 4. Testing & Verification
 
 ### Automated Unit Tests
-19 comprehensive unit tests verifying title trimming/limits, Tiptap JSON schema structure, node/mark whitelists, URL protocol whitelists, 2 MiB payload caps, and text-to-document conversion:
+31 comprehensive unit tests verifying title trimming/limits, Tiptap JSON schema structure, node/mark whitelists, URL protocol whitelists, 2 MiB payload caps, text-to-document conversion, Markdown/Plain Text export formatting, word/char counts, and role-based permissions enforcement:
 ```bash
 npm run test:unit
 ```

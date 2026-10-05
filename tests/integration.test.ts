@@ -275,6 +275,59 @@ describe("Document API integration", () => {
     expect(after.length).toBe(before.length);
   });
 
+  // ── Scenario 4b: Role-Based Sharing & Revocation ──────────────────────────
+
+  it("A: updates B's role to 'viewer'", async () => {
+    const res = await fetch(`${BASE_URL}/api/documents/${docId}/shares`, {
+      method: "POST",
+      headers: authHeaders(cookies.A),
+      body: JSON.stringify({ email: TEST_EMAILS.B, role: "viewer" }),
+    });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.recipient.role).toBe("viewer");
+  });
+
+  it("B: sees viewer role and is forbidden from saving content", async () => {
+    const readRes = await fetch(`${BASE_URL}/api/documents/${docId}`, {
+      headers: { Cookie: cookies.B },
+    });
+    expect(readRes.status).toBe(200);
+    const doc = await readRes.json();
+    expect(doc.role).toBe("viewer");
+    expect(doc.canEdit).toBe(false);
+
+    // Attempt to save as viewer -> must be rejected with 403
+    const saveRes = await fetch(`${BASE_URL}/api/documents/${docId}`, {
+      method: "PATCH",
+      headers: authHeaders(cookies.B),
+      body: JSON.stringify({
+        contentJson: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "viewer illegal save" }] }],
+        },
+        revision: doc.revision,
+      }),
+    });
+    expect(saveRes.status).toBe(403);
+  });
+
+  it("A: restores B to editor role and B can save again", async () => {
+    const shareRes = await fetch(`${BASE_URL}/api/documents/${docId}/shares`, {
+      method: "POST",
+      headers: authHeaders(cookies.A),
+      body: JSON.stringify({ email: TEST_EMAILS.B, role: "editor" }),
+    });
+    expect(shareRes.status).toBe(200);
+
+    const docRes = await fetch(`${BASE_URL}/api/documents/${docId}`, {
+      headers: { Cookie: cookies.B },
+    });
+    const doc = await docRes.json();
+    expect(doc.role).toBe("editor");
+    expect(doc.canEdit).toBe(true);
+  });
+
   // ── Scenario 5: A reopens and sees B's content ─────────────────────────────
 
   it("A: reopens and sees B's saved content", async () => {
@@ -395,5 +448,24 @@ describe("Document API integration", () => {
     expect(text).toContain("alert");
     // There should be no "type":"script" node
     expect(text).not.toContain('"type":"script"');
+  });
+
+  // ── Scenario 8: Share revocation ──────────────────────────────────────────
+
+  it("A: revokes B's access; B cannot access document anymore", async () => {
+    const bUser = createdUserIds.find((_, i) => Object.values(TEST_EMAILS)[i] === TEST_EMAILS.B);
+    expect(bUser).toBeDefined();
+
+    const revokeRes = await fetch(`${BASE_URL}/api/documents/${docId}/shares?userId=${bUser}`, {
+      method: "DELETE",
+      headers: authHeaders(cookies.A),
+    });
+    expect(revokeRes.status).toBe(200);
+
+    // B attempts to access the document -> must receive 404
+    const bAccessRes = await fetch(`${BASE_URL}/api/documents/${docId}`, {
+      headers: { Cookie: cookies.B },
+    });
+    expect(bAccessRes.status).toBe(404);
   });
 });

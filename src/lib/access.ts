@@ -13,7 +13,7 @@
 
 import { getDb } from "@/db";
 import { documents, documentShares, user } from "@/db/schema";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Session } from "@/lib/auth";
 
 /** Returns the session's user ID or throws a 401-style error. */
@@ -38,6 +38,15 @@ export async function getAccessibleDocument(
   userId: string
 ) {
   const db = getDb();
+  const owned = await getOwnedDocument(documentId, userId);
+  if (owned) {
+    return {
+      ...owned,
+      role: "owner" as const,
+      canEdit: true,
+    };
+  }
+
   const rows = await db
     .select({
       id: documents.id,
@@ -48,24 +57,20 @@ export async function getAccessibleDocument(
       revision: documents.revision,
       createdAt: documents.createdAt,
       updatedAt: documents.updatedAt,
+      role: documentShares.role,
     })
     .from(documents)
-    .where(
-      and(
-        eq(documents.id, documentId),
-        or(
-          eq(documents.ownerId, userId),
-          sql`EXISTS (
-            SELECT 1 FROM document_shares ds
-            WHERE ds.document_id = ${documentId}
-              AND ds.user_id = ${userId}
-          )`
-        )
-      )
-    )
+    .innerJoin(documentShares, eq(documentShares.documentId, documents.id))
+    .where(and(eq(documents.id, documentId), eq(documentShares.userId, userId)))
     .limit(1);
 
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  const role = rows[0].role === "viewer" ? ("viewer" as const) : ("editor" as const);
+  return {
+    ...rows[0],
+    role,
+    canEdit: role === "editor",
+  };
 }
 
 /** Returns the document only if the user is the owner. */
@@ -96,6 +101,7 @@ export async function listDocumentsForUser(userId: string) {
       revision: documents.revision,
       updatedAt: documents.updatedAt,
       relationship: sql<"owned">`'owned'`,
+      role: sql<"owner">`'owner'`,
     })
     .from(documents)
     .innerJoin(user, eq(user.id, documents.ownerId))
@@ -112,6 +118,7 @@ export async function listDocumentsForUser(userId: string) {
       revision: documents.revision,
       updatedAt: documents.updatedAt,
       relationship: sql<"shared">`'shared'`,
+      role: documentShares.role,
     })
     .from(documentShares)
     .innerJoin(documents, eq(documents.id, documentShares.documentId))
@@ -132,6 +139,7 @@ export async function listDocumentShares(documentId: string, ownerId: string) {
       userId: documentShares.userId,
       userName: user.name,
       userEmail: user.email,
+      role: documentShares.role,
       createdAt: documentShares.createdAt,
     })
     .from(documentShares)
@@ -139,11 +147,12 @@ export async function listDocumentShares(documentId: string, ownerId: string) {
     .where(eq(documentShares.documentId, documentId));
 }
 
-/** Grants edit access. Idempotent; rejects self-share. */
+/** Grants or updates access. Idempotent; rejects self-share. */
 export async function createShare(
   documentId: string,
   ownerId: string,
-  recipientId: string
+  recipientId: string,
+  role: "editor" | "viewer" = "editor"
 ) {
   if (ownerId === recipientId) {
     throw new AuthError("Cannot share with yourself", 400);
@@ -152,9 +161,26 @@ export async function createShare(
   if (!doc) throw new AuthError("Not found", 404);
 
   const db = getDb();
-  // Upsert — do nothing on conflict (idempotent).
   await db
     .insert(documentShares)
-    .values({ documentId, userId: recipientId })
-    .onConflictDoNothing();
+    .values({ documentId, userId: recipientId, role })
+    .onConflictDoUpdate({
+      target: [documentShares.documentId, documentShares.userId],
+      set: { role },
+    });
+}
+
+/** Revokes access to a document (owner only). */
+export async function removeShare(
+  documentId: string,
+  ownerId: string,
+  recipientId: string
+) {
+  const doc = await getOwnedDocument(documentId, ownerId);
+  if (!doc) throw new AuthError("Not found", 404);
+
+  const db = getDb();
+  await db
+    .delete(documentShares)
+    .where(and(eq(documentShares.documentId, documentId), eq(documentShares.userId, recipientId)));
 }

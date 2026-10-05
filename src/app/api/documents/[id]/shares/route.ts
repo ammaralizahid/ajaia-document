@@ -58,15 +58,47 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     }
 
     const recipient = recipients[0];
-    await createShare(id, userId, recipient.id);
+    const role: "editor" | "viewer" = body.role === "viewer" ? "viewer" : "editor";
+    await createShare(id, userId, recipient.id, role);
 
-    return NextResponse.json({ ok: true, recipient: { id: recipient.id, name: recipient.name, email: recipient.email } });
+    return NextResponse.json({
+      ok: true,
+      recipient: { id: recipient.id, name: recipient.name, email: recipient.email, role },
+    });
   } catch (e) {
     if (e instanceof AuthError) {
       return NextResponse.json({ error: e.message }, { status: e.status });
     }
     if (e instanceof Error) {
       return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/** DELETE /api/documents/[id]/shares — revoke access from a user (owner only) */
+export async function DELETE(request: NextRequest, ctx: RouteContext) {
+  try {
+    const { id } = await ctx.params;
+    const session = await auth.api.getSession({ headers: request.headers });
+    const userId = requireUserId(session);
+
+    const url = new URL(request.url);
+    const targetUserId =
+      url.searchParams.get("userId") ??
+      (await request.json().catch(() => ({})))?.userId;
+
+    if (!targetUserId || typeof targetUserId !== "string") {
+      return NextResponse.json({ error: "userId is required to revoke access" }, { status: 400 });
+    }
+
+    const { removeShare } = await import("@/lib/access");
+    await removeShare(id, userId, targetUserId);
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    if (e instanceof AuthError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

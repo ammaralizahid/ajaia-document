@@ -29,9 +29,16 @@ type DocumentData = {
   isOwner: boolean;
   ownerId: string;
   updatedAt: string;
+  role?: "owner" | "editor" | "viewer";
+  canEdit?: boolean;
 };
 
-type ShareEntry = { userId: string; userName: string; userEmail: string };
+type ShareEntry = {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  role?: "editor" | "viewer";
+};
 
 export function EditorClient({ documentId }: { documentId: string }) {
   const router = useRouter();
@@ -66,6 +73,8 @@ export function EditorClient({ documentId }: { documentId: string }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [shares, setShares] = useState<ShareEntry[]>([]);
   const [shareEmail, setShareEmail] = useState("");
+  const [shareRole, setShareRole] = useState<"editor" | "viewer">("editor");
+  const [revokingId, setRevokingId] = useState<string | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
@@ -107,6 +116,7 @@ export function EditorClient({ documentId }: { documentId: string }) {
   // ── Save logic ─────────────────────────────────────────────────────────────
 
   const performSave = useCallback(async (gen: number): Promise<boolean> => {
+    if (doc?.canEdit === false) return false;
     if (savingRef.current) return false;
     if (gen <= savedGenRef.current) return true; // already saved
 
@@ -162,7 +172,7 @@ export function EditorClient({ documentId }: { documentId: string }) {
       savingRef.current = false;
       pendingGenRef.current = null;
     }
-  }, [documentId]);
+  }, [documentId, doc?.canEdit]);
 
   const scheduleSave = useCallback(() => {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -176,15 +186,18 @@ export function EditorClient({ documentId }: { documentId: string }) {
     latestContentRef.current = json;
     localEditGenRef.current += 1;
     setStats(getDocumentStats(json));
-    setSaveStatus("unsaved");
-    setSaveError(null);
-    scheduleSave();
-  }, [scheduleSave]);
+    if (doc?.canEdit !== false) {
+      setSaveStatus("unsaved");
+      setSaveError(null);
+      scheduleSave();
+    }
+  }, [doc?.canEdit, scheduleSave]);
 
   const handleExplicitSave = useCallback(async () => {
+    if (doc?.canEdit === false) return;
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     await performSave(localEditGenRef.current);
-  }, [performSave]);
+  }, [doc?.canEdit, performSave]);
 
   // ── Export handlers ────────────────────────────────────────────────────────
 
@@ -273,11 +286,13 @@ export function EditorClient({ documentId }: { documentId: string }) {
       const res = await fetch(`/api/documents/${documentId}/shares`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: shareEmail.trim() }),
+        body: JSON.stringify({ email: shareEmail.trim(), role: shareRole }),
       });
       const data = await res.json();
       if (res.ok) {
-        setShareSuccess(`Shared with ${data.recipient.name} (${data.recipient.email})`);
+        setShareSuccess(
+          `Shared with ${data.recipient.name} as ${data.recipient.role === "viewer" ? "viewer" : "editor"}`
+        );
         setShareEmail("");
         // Refresh share list
         const r2 = await fetch(`/api/documents/${documentId}/shares`);
@@ -289,6 +304,29 @@ export function EditorClient({ documentId }: { documentId: string }) {
       setShareError("Network error. Please try again.");
     } finally {
       setShareLoading(false);
+    }
+  };
+
+  const handleRevokeShare = async (targetUserId: string) => {
+    if (!doc?.isOwner) return;
+    setRevokingId(targetUserId);
+    setShareError(null);
+    setShareSuccess(null);
+    try {
+      const res = await fetch(`/api/documents/${documentId}/shares?userId=${encodeURIComponent(targetUserId)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setShares((prev) => prev.filter((s) => s.userId !== targetUserId));
+        setShareSuccess("Access revoked.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setShareError(data.error ?? "Failed to revoke access");
+      }
+    } catch {
+      setShareError("Network error revoking access.");
+    } finally {
+      setRevokingId(null);
     }
   };
 
@@ -424,11 +462,19 @@ export function EditorClient({ documentId }: { documentId: string }) {
               </button>
             )}
             <div className="flex items-center gap-2">
-              <span className={`text-xs ${saveStatusColor[saveStatus]}`}>
-                {saveStatusLabel[saveStatus]}
-              </span>
+              {doc.canEdit === false ? (
+                <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  View only
+                </span>
+              ) : (
+                <span className={`text-xs ${saveStatusColor[saveStatus]}`}>
+                  {saveStatusLabel[saveStatus]}
+                </span>
+              )}
               {!doc.isOwner && (
-                <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">Shared</span>
+                <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">
+                  {doc.role === "viewer" ? "Shared (Viewer)" : "Shared (Editor)"}
+                </span>
               )}
               <span className="text-[11px] text-gray-400 font-mono hidden sm:inline">
                 {stats.words} {stats.words === 1 ? "word" : "words"}
@@ -454,13 +500,15 @@ export function EditorClient({ documentId }: { documentId: string }) {
                 Reload
               </button>
             )}
-            <button
-              onClick={handleExplicitSave}
-              disabled={saveStatus === "saving" || saveStatus === "saved" || saveStatus === "idle"}
-              className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Save
-            </button>
+            {doc.canEdit !== false && (
+              <button
+                onClick={handleExplicitSave}
+                disabled={saveStatus === "saving" || saveStatus === "saved" || saveStatus === "idle"}
+                className="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save
+              </button>
+            )}
             {/* Export dropdown */}
             <div className="relative">
               <button
@@ -562,8 +610,8 @@ export function EditorClient({ documentId }: { documentId: string }) {
             key={doc.id}
             initialContent={doc.contentJson ?? emptyDocument()}
             onContentChange={handleContentChange}
-            editable={true}
-            placeholder="Start writing…"
+            editable={doc.canEdit !== false}
+            placeholder={doc.canEdit === false ? "Document is view-only." : "Start writing…"}
           />
         )}
       </main>
@@ -597,10 +645,18 @@ export function EditorClient({ documentId }: { documentId: string }) {
                 onKeyDown={(e) => e.key === "Enter" && handleShare()}
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
               />
+              <select
+                value={shareRole}
+                onChange={(e) => setShareRole(e.target.value as "editor" | "viewer")}
+                className="cursor-pointer rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs text-gray-700 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="editor">Can edit</option>
+                <option value="viewer">Can view</option>
+              </select>
               <button
                 onClick={handleShare}
                 disabled={shareLoading || !shareEmail.trim()}
-                className="cursor-pointer rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="cursor-pointer rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {shareLoading ? "Adding…" : "Add"}
               </button>
@@ -615,11 +671,28 @@ export function EditorClient({ documentId }: { documentId: string }) {
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-xs font-semibold text-purple-700">
                         {s.userName.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-800">{s.userName}</p>
-                        <p className="text-[11px] text-gray-400">{s.userEmail}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-gray-800 truncate">{s.userName}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{s.userEmail}</p>
                       </div>
-                      <span className="ml-auto text-[11px] text-gray-400">Can edit</span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                        s.role === "viewer"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-purple-100 text-purple-800"
+                      }`}>
+                        {s.role === "viewer" ? "Can view" : "Can edit"}
+                      </span>
+                      {doc.isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeShare(s.userId)}
+                          disabled={revokingId === s.userId}
+                          title="Revoke access"
+                          className="cursor-pointer rounded px-1.5 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                        >
+                          {revokingId === s.userId ? "…" : "Remove"}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -627,7 +700,7 @@ export function EditorClient({ documentId }: { documentId: string }) {
             )}
 
             <p className="mt-4 text-[11px] text-gray-400">
-              Share revocation and viewer roles are not yet supported. All shared users can edit.
+              Owners can grant editing or view-only access, or revoke access at any time.
             </p>
           </div>
         </div>
