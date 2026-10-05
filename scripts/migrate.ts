@@ -4,7 +4,8 @@ import { migrate as migratePg } from "drizzle-orm/node-postgres/migrator";
 import { migrate as migrateNeon } from "drizzle-orm/neon-http/migrator";
 
 async function runMigrate() {
-  const url = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const url = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL ??
+    Object.entries(process.env).find(([k, v]) => Boolean(v) && (k.endsWith("POSTGRES_URL") || k.endsWith("DATABASE_URL")))?.[1];
   if (!url) {
     console.error("DATABASE_URL, DATABASE_MIGRATION_URL, or POSTGRES_URL is required.");
     process.exit(1);

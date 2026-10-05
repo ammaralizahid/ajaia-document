@@ -27,12 +27,20 @@ function isLocalhost(url: string): boolean {
   }
 }
 
+function resolveDbUrl(): string | undefined {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.POSTGRES_URL) return process.env.POSTGRES_URL;
+  // Match Neon variables created with project prefixes like ajaia_document_POSTGRES_URL
+  const entry = Object.entries(process.env).find(([k, v]) => Boolean(v) && (k.endsWith("POSTGRES_URL") || k.endsWith("DATABASE_URL")));
+  return entry?.[1];
+}
+
 function getDb() {
   if (_db) return _db;
-  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const url = resolveDbUrl();
   if (!url) {
     throw new Error(
-      "DATABASE_URL (or POSTGRES_URL) is not set. Add it to your .env.local file or Vercel Environment Variables."
+      "Database URL is not set. Add DATABASE_URL (or POSTGRES_URL) to your Environment Variables."
     );
   }
 

@@ -58,7 +58,8 @@ async function signUpUser(auth: ReturnType<typeof getAuth>, email: string, passw
 }
 
 async function main() {
-  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL ||
+    Object.entries(process.env).find(([k, v]) => Boolean(v) && (k.endsWith("POSTGRES_URL") || k.endsWith("DATABASE_URL")))?.[1];
   if (!dbUrl) {
     console.error("DATABASE_URL or POSTGRES_URL not set.");
     process.exit(1);
