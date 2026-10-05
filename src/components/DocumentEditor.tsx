@@ -257,10 +257,10 @@ export default function DocumentEditor({
   const headingValue = headingLevel ? String(headingLevel) : "p";
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="print-document-container flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
       {/* Toolbar */}
       {editable && (
-        <div className="flex flex-wrap items-center gap-0.5 border-b border-gray-200 bg-gray-50 p-2">
+        <div className="no-print flex flex-wrap items-center gap-0.5 border-b border-gray-200 bg-gray-50 p-2">
           {/* Heading select */}
           <select
             className="cursor-pointer h-8 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:border-blue-400 focus:outline-none"

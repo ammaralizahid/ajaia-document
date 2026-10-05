@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useSession, signOut } from "@/lib/auth-client";
 import DocumentEditor from "@/components/DocumentEditor";
 import { emptyDocument } from "@/lib/content-validation";
+import { tiptapToMarkdown, tiptapToPlainText, getDocumentStats, downloadFile } from "@/lib/export";
 
 type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed" | "conflict";
 
@@ -74,6 +75,10 @@ export function EditorClient({ documentId }: { documentId: string }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Export menu & stats
+  const [exportOpen, setExportOpen] = useState(false);
+  const [stats, setStats] = useState({ words: 0, chars: 0 });
+
   // ── Load document ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -88,6 +93,7 @@ export function EditorClient({ documentId }: { documentId: string }) {
         setTitle(data.title);
         latestContentRef.current = data.contentJson ?? emptyDocument();
         revisionRef.current = data.revision;
+        setStats(getDocumentStats(data.contentJson));
         setSaveStatus("idle");
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : "Failed to load document");
@@ -169,6 +175,7 @@ export function EditorClient({ documentId }: { documentId: string }) {
   const handleContentChange = useCallback((json: Record<string, unknown>) => {
     latestContentRef.current = json;
     localEditGenRef.current += 1;
+    setStats(getDocumentStats(json));
     setSaveStatus("unsaved");
     setSaveError(null);
     scheduleSave();
@@ -178,6 +185,27 @@ export function EditorClient({ documentId }: { documentId: string }) {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     await performSave(localEditGenRef.current);
   }, [performSave]);
+
+  // ── Export handlers ────────────────────────────────────────────────────────
+
+  const handleExportMarkdown = () => {
+    const md = tiptapToMarkdown(latestContentRef.current);
+    const safeTitle = (title.trim() || "untitled").replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_");
+    downloadFile(`${safeTitle}.md`, md, "text/markdown;charset=utf-8");
+    setExportOpen(false);
+  };
+
+  const handleExportPlainText = () => {
+    const txt = tiptapToPlainText(latestContentRef.current);
+    const safeTitle = (title.trim() || "untitled").replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_");
+    downloadFile(`${safeTitle}.txt`, txt, "text/plain;charset=utf-8");
+    setExportOpen(false);
+  };
+
+  const handlePrintPdf = () => {
+    setExportOpen(false);
+    window.print();
+  };
 
   // Keyboard shortcut
   useEffect(() => {
@@ -402,6 +430,9 @@ export function EditorClient({ documentId }: { documentId: string }) {
               {!doc.isOwner && (
                 <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">Shared</span>
               )}
+              <span className="text-[11px] text-gray-400 font-mono hidden sm:inline">
+                {stats.words} {stats.words === 1 ? "word" : "words"}
+              </span>
             </div>
           </div>
 
@@ -430,6 +461,51 @@ export function EditorClient({ documentId }: { documentId: string }) {
             >
               Save
             </button>
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExportOpen(!exportOpen)}
+                title="Export document"
+                className="cursor-pointer rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1"
+              >
+                <span>Export</span>
+                <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {exportOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
+                  <div className="absolute right-0 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg z-40">
+                    <button
+                      type="button"
+                      onClick={handleExportMarkdown}
+                      className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span>📄</span>
+                      <span>Markdown (.md)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePrintPdf}
+                      className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span>🖨️</span>
+                      <span>PDF (Print preview)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPlainText}
+                      className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left transition-colors"
+                    >
+                      <span>📝</span>
+                      <span>Plain Text (.txt)</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             {doc.isOwner && (
               <>
                 <button

@@ -9,6 +9,11 @@ import {
   textToTiptapDocument,
   emptyDocument,
 } from "../src/lib/content-validation";
+import {
+  tiptapToMarkdown,
+  tiptapToPlainText,
+  getDocumentStats,
+} from "../src/lib/export";
 
 describe("validateTitle", () => {
   it("accepts valid title", () => {
@@ -167,3 +172,117 @@ describe("textToTiptapDocument", () => {
     expect(() => validateTiptapContent(doc)).not.toThrow();
   });
 });
+
+describe("tiptapToMarkdown", () => {
+  it("converts headings with correct hash levels", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Title" }] },
+        { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Subtitle" }] },
+      ],
+    };
+    const md = tiptapToMarkdown(doc);
+    expect(md).toBe("# Title\n\n## Subtitle");
+  });
+
+  it("converts bold, italic, strike, and links", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Bold", marks: [{ type: "bold" }] },
+            { type: "text", text: " and " },
+            { type: "text", text: "Italic", marks: [{ type: "italic" }] },
+            { type: "text", text: " and " },
+            { type: "text", text: "Link", marks: [{ type: "link", attrs: { href: "https://example.com" } }] },
+          ],
+        },
+      ],
+    };
+    const md = tiptapToMarkdown(doc);
+    expect(md).toBe("**Bold** and *Italic* and [Link](https://example.com)");
+  });
+
+  it("converts bullet and ordered lists", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item 1" }] }] },
+            { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Item 2" }] }] },
+          ],
+        },
+      ],
+    };
+    const md = tiptapToMarkdown(doc);
+    expect(md).toBe("- Item 1\n- Item 2");
+  });
+
+  it("converts blockquotes", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "A wise quote" }] }],
+        },
+      ],
+    };
+    const md = tiptapToMarkdown(doc);
+    expect(md).toBe("> A wise quote");
+  });
+
+  it("handles empty or null documents gracefully", () => {
+    expect(tiptapToMarkdown(null)).toBe("");
+    expect(tiptapToMarkdown({})).toBe("");
+    expect(tiptapToMarkdown({ type: "doc", content: [] })).toBe("");
+  });
+});
+
+describe("getDocumentStats", () => {
+  it("counts words and characters accurately", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "The quick brown fox jumps over the lazy dog." }],
+        },
+      ],
+    };
+    const stats = getDocumentStats(doc);
+    expect(stats.words).toBe(9);
+    expect(stats.chars).toBe(44);
+  });
+
+  it("returns zeros for empty doc", () => {
+    const stats = getDocumentStats(emptyDocument());
+    expect(stats.words).toBe(0);
+    expect(stats.chars).toBe(0);
+  });
+});
+
+describe("tiptapToPlainText", () => {
+  it("extracts plain text stripped of markdown markup", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Bold", marks: [{ type: "bold" }] },
+            { type: "text", text: " and plain text" },
+          ],
+        },
+      ],
+    };
+    expect(tiptapToPlainText(doc)).toBe("Bold and plain text");
+  });
+});
+
+

@@ -20,3 +20,35 @@ button, [role="button"], a, select {
 button:disabled, [role="button"]:disabled {
   cursor: not-allowed;
 }
+
+/* Print / PDF Export styles */
+@media print {
+  header,
+  .no-print,
+  [data-no-print="true"] {
+    display: none !important;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print-document-container {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .tiptap {
+    min-height: auto !important;
+    padding: 0 !important;
+  }
+}
+
