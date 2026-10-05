@@ -1,0 +1,20 @@
+Ajaia Product Roadmap & Architecture Notes
+
+1. Executive Summary
+This document was imported directly from a plain UTF-8 text file. The Ajaia Document Editor automatically parses paragraphs and converts plain text into authoritative Tiptap JSON blocks stored in PostgreSQL.
+
+2. Key Strategic Objectives
+- Scalable real-time document workspace for distributed teams
+- Enterprise-grade role-based access control (Owner, Editor, Viewer)
+- Defense-in-depth optimistic concurrency control (CAS revision tracking)
+- Flexible multi-format export to Markdown and print-ready PDF
+
+3. Technical Highlights
+- Next.js 16 App Router with React 19 server components
+- Durable JSONB persistence with Drizzle ORM on Neon PostgreSQL
+- Sub-50ms debounced autosave with manual Cmd+S shortcut support
+
+4. Next Milestones
+- Rich collaborative comments and thread annotations
+- Offline draft synchronization via Service Workers
+- Fine-grained audit logs for document revisions
