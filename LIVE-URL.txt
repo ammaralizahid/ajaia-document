@@ -1,0 +1,11 @@
+STATUS: PENDING_ACCOUNT_PROVISIONING
+
+External deployment to Vercel and Neon was not performed during this local verification phase because third-party provider credentials (Vercel and Neon account tokens) were not provisioned in the local environment.
+
+Per assessment instructions ("Never fabricate a live URL or a successful check"), this file records the truthful pending state.
+
+The application is completely configured and verified for production:
+- Next.js production build (`npm run build`) compiles successfully without external database calls.
+- Database connection layer supports serverless Neon HTTP (`@neondatabase/serverless`) out of the box.
+- Schema migrations (`drizzle/migrations/`) are committed and apply cleanly with `npm run db:migrate`.
+- Complete step-by-step reproduction instructions for deploying to Vercel Hobby and Neon Free are documented in README.md.

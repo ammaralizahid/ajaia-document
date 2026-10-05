@@ -1,0 +1,12 @@
+Project Kickoff Notes
+
+This document was imported from a plain UTF-8 text file.
+It contains multiple paragraphs and formatting.
+
+Key Discussion Points:
+1. Document creation and editing
+2. File upload and conversion
+3. Asynchronous sharing and permissions
+4. Optimistic concurrency and conflict detection
+
+End of imported notes.
